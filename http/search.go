@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -56,7 +59,7 @@ var searchHandler = withUser(func(w http.ResponseWriter, r *http.Request, d *dat
 			}
 		}
 	}()
-	query := r.URL.Query().Get("query")
+	query := searchQuery(r)
 
 	err := search.Search(ctx, d.user.Fs, r.URL.Path, query, d, func(path string, f os.FileInfo) error {
 		select {
@@ -80,3 +83,24 @@ var searchHandler = withUser(func(w http.ResponseWriter, r *http.Request, d *dat
 
 	return 0, nil
 })
+
+// searchQuery builds the search query string from the request, appending
+// the optional limit and offset pagination parameters so large result
+// sets can be truncated and paged instead of overwhelming the frontend.
+func searchQuery(r *http.Request) string {
+	query := r.URL.Query().Get("query")
+
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		if limit, err := strconv.Atoi(raw); err == nil && limit > 0 {
+			query = fmt.Sprintf("%s limit:%d", query, limit)
+		}
+	}
+
+	if raw := r.URL.Query().Get("offset"); raw != "" {
+		if offset, err := strconv.Atoi(raw); err == nil && offset >= 0 {
+			query = fmt.Sprintf("%s offset:%d", query, offset)
+		}
+	}
+
+	return strings.TrimSpace(query)
+}

@@ -9,6 +9,65 @@ import (
 	"github.com/spf13/afero"
 )
 
+func TestTruncateItems(t *testing.T) {
+	makeItems := func(n int) []*FileInfo {
+		items := make([]*FileInfo, 0, n)
+		for i := 0; i < n; i++ {
+			items = append(items, &FileInfo{Name: string(rune('a' + i))})
+		}
+		return items
+	}
+	names := func(items []*FileInfo) []string {
+		out := []string{}
+		for _, item := range items {
+			out = append(out, item.Name)
+		}
+		return out
+	}
+
+	t.Run("no limit returns everything after offset", func(t *testing.T) {
+		got := names(TruncateItems(makeItems(5), 2, 0))
+		if len(got) != 3 || got[0] != "c" || got[2] != "e" {
+			t.Fatalf("expected [c d e], got %v", got)
+		}
+	})
+
+	t.Run("limit truncates the results", func(t *testing.T) {
+		got := names(TruncateItems(makeItems(10), 0, 3))
+		if len(got) != 3 || got[0] != "a" || got[2] != "c" {
+			t.Fatalf("expected [a b c], got %v", got)
+		}
+	})
+
+	t.Run("limit and offset together", func(t *testing.T) {
+		got := names(TruncateItems(makeItems(10), 4, 2))
+		if len(got) != 2 || got[0] != "e" || got[1] != "f" {
+			t.Fatalf("expected [e f], got %v", got)
+		}
+	})
+
+	t.Run("offset beyond the end returns empty", func(t *testing.T) {
+		got := TruncateItems(makeItems(3), 10, 0)
+		if len(got) != 0 {
+			t.Fatalf("expected empty slice, got %v", got)
+		}
+	})
+
+	t.Run("negative offset is treated as zero", func(t *testing.T) {
+		got := names(TruncateItems(makeItems(3), -5, 2))
+		if len(got) != 2 || got[0] != "a" {
+			t.Fatalf("expected [a b], got %v", got)
+		}
+	})
+
+	t.Run("limit larger than the remaining items is a no-op", func(t *testing.T) {
+		got := names(TruncateItems(makeItems(2), 0, 100))
+		if len(got) != 2 {
+			t.Fatalf("expected 2 items, got %v", got)
+		}
+	})
+}
+
 func TestWithinScope(t *testing.T) {
 	t.Run("non-scoped filesystem is a no-op", func(t *testing.T) {
 		ok, err := WithinScope(afero.NewOsFs(), "/anything")

@@ -65,6 +65,10 @@ type FileOptions struct {
 	Token      string
 	Checker    rules.Checker
 	Content    bool
+	// Limit and Offset paginate the items of an expanded directory
+	// listing. A Limit <= 0 means no limit.
+	Limit  int
+	Offset int
 }
 
 type ImageResolution struct {
@@ -92,7 +96,7 @@ func NewFileInfo(opts *FileOptions) (*FileInfo, error) {
 
 	if opts.Expand {
 		if file.IsDir {
-			if err := file.readListing(opts.Checker, opts.ReadHeader, opts.CalcImgRes); err != nil {
+			if err := file.readListing(opts.Checker, opts.ReadHeader, opts.CalcImgRes, opts.Limit, opts.Offset); err != nil {
 				return nil, err
 			}
 			return file, nil
@@ -452,7 +456,7 @@ func (i *FileInfo) addSubtitle(fPath string) {
 	i.Subtitles = append(i.Subtitles, fPath)
 }
 
-func (i *FileInfo) readListing(checker rules.Checker, readHeader bool, calcImgRes bool) error {
+func (i *FileInfo) readListing(checker rules.Checker, readHeader bool, calcImgRes bool, limit, offset int) error {
 	dir, err := readDir(i.Fs, i.Path)
 	if err != nil {
 		return err
@@ -532,8 +536,27 @@ func (i *FileInfo) readListing(checker rules.Checker, readHeader bool, calcImgRe
 		listing.Items = append(listing.Items, file)
 	}
 
+	listing.Items = TruncateItems(listing.Items, offset, limit)
+
 	i.Listing = listing
 	return nil
+}
+
+// TruncateItems applies offset/limit pagination to a list of items,
+// truncating the result so huge listings do not overwhelm clients.
+// A limit <= 0 disables the limit.
+func TruncateItems(items []*FileInfo, offset, limit int) []*FileInfo {
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= len(items) {
+		return []*FileInfo{}
+	}
+	items = items[offset:]
+	if limit > 0 && limit < len(items) {
+		items = items[:limit]
+	}
+	return items
 }
 
 func readDir(afs afero.Fs, dirname string) ([]os.FileInfo, error) {

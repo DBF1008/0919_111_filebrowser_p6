@@ -4,11 +4,14 @@ import (
 	"mime"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
 var (
-	typeRegexp = regexp.MustCompile(`type:(\w+)`)
+	typeRegexp   = regexp.MustCompile(`type:(\w+)`)
+	limitRegexp  = regexp.MustCompile(`limit:(\d+)`)
+	offsetRegexp = regexp.MustCompile(`offset:(\d+)`)
 )
 
 type condition func(path string) bool
@@ -73,6 +76,20 @@ func parseSearch(value string) *searchOptions {
 	if len(types) > 0 {
 		// Remove the fields from the search value.
 		value = typeRegexp.ReplaceAllString(value, "")
+	}
+
+	// Extract the pagination options, if any.
+	if m := limitRegexp.FindStringSubmatch(value); len(m) == 2 {
+		if limit, err := strconv.Atoi(m[1]); err == nil && limit > 0 {
+			opts.Limit = limit
+		}
+		value = limitRegexp.ReplaceAllString(value, "")
+	}
+	if m := offsetRegexp.FindStringSubmatch(value); len(m) == 2 {
+		if offset, err := strconv.Atoi(m[1]); err == nil && offset >= 0 {
+			opts.Offset = offset
+		}
+		value = offsetRegexp.ReplaceAllString(value, "")
 	}
 
 	// If it's case insensitive, put everything in lowercase.
