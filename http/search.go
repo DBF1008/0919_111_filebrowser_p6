@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -58,7 +59,13 @@ var searchHandler = withUser(func(w http.ResponseWriter, r *http.Request, d *dat
 	}()
 	query := r.URL.Query().Get("query")
 
-	err := search.Search(ctx, d.user.Fs, r.URL.Path, query, d, func(path string, f os.FileInfo) error {
+	// limit caps the number of streamed results and offset skips the first
+	// matches, so clients can paginate instead of receiving unbounded
+	// result sets that freeze the frontend on large directories.
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+
+	err := search.Search(ctx, d.user.Fs, r.URL.Path, query, limit, offset, d, func(path string, f os.FileInfo) error {
 		select {
 		case <-ctx.Done():
 		case response <- map[string]interface{}{

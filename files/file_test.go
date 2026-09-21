@@ -4,10 +4,39 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/spf13/afero"
 )
+
+func TestTruncateResults(t *testing.T) {
+	items := []int{1, 2, 3, 4, 5}
+
+	tests := []struct {
+		name          string
+		offset, limit int
+		want          []int
+	}{
+		{"no truncation", 0, 0, []int{1, 2, 3, 4, 5}},
+		{"limit only", 0, 2, []int{1, 2}},
+		{"offset only", 2, 0, []int{3, 4, 5}},
+		{"offset and limit", 1, 2, []int{2, 3}},
+		{"offset beyond length", 10, 0, []int{}},
+		{"limit beyond length", 0, 100, []int{1, 2, 3, 4, 5}},
+		{"negative offset", -3, 2, []int{1, 2}},
+		{"negative limit means unlimited", 1, -1, []int{2, 3, 4, 5}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := TruncateResults(items, tt.offset, tt.limit)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("TruncateResults(%v, %d, %d) = %v, want %v", items, tt.offset, tt.limit, got, tt.want)
+			}
+		})
+	}
+}
 
 func TestWithinScope(t *testing.T) {
 	t.Run("non-scoped filesystem is a no-op", func(t *testing.T) {

@@ -588,3 +588,21 @@ func lstatIfPossible(afs afero.Fs, name string) (os.FileInfo, error) {
 
 	return afs.Stat(name)
 }
+
+// TruncateResults applies offset/limit pagination to a slice of results,
+// such as search matches or directory listings. offset skips the first
+// results and limit caps how many are returned; a limit <= 0 means no
+// limit. Out-of-range values are clamped instead of failing.
+func TruncateResults[T any](items []T, offset, limit int) []T {
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > len(items) {
+		offset = len(items)
+	}
+	items = items[offset:]
+	if limit > 0 && limit < len(items) {
+		items = items[:limit]
+	}
+	return items
+}
